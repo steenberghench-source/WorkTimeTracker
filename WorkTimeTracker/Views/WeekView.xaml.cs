@@ -257,30 +257,6 @@ namespace WorkTimeTracker.Views
             // Voorkom dat DataGrid nog selectie/klik-gedrag uitvoert
             e.Handled = true;
         }
-
-        private void DagCell_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not FrameworkElement fe)
-                return;
-
-            if (fe.DataContext is not DagUrenViewModel dag)
-                return;
-
-            // Weekdag -> terug naar Normaal
-            // Weekenddag -> terug naar Weekend
-            if (dag.Datum.DayOfWeek == DayOfWeek.Saturday ||
-                dag.Datum.DayOfWeek == DayOfWeek.Sunday)
-            {
-                dag.Status = DagStatus.Weekend;
-            }
-            else
-            {
-                dag.Status = DagStatus.Normaal;
-            }
-
-            // voorkom dat DataGrid er nog iets mee doet (selectie / contextmenu)
-            e.Handled = true;
-        }
         private void WeekDataGrid_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)
         {
             if (sender is DataGrid grid)
@@ -328,11 +304,62 @@ namespace WorkTimeTracker.Views
 
             if (dlg.ShowDialog() == true)
             {
-                PrintHelper.PrintWeeks(dlg.Jaar, dlg.VanWeek, dlg.TotWeek);
+                PrintHelper.PrintWeeks(dlg.Jaar, dlg.VanWeek, dlg.TotWeek, vm.GebruikersNaam);
 
                 // huidige week in de UI markeren als afgedrukt
                 vm.ReedsAfgedrukt = true;
             }
+        }
+        private void PrintCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            // Hergebruik je bestaande klik-logica
+            Afdrukken_Click(this, new RoutedEventArgs());
+        }
+        private void AfgedruktBadge_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (DataContext is WeekViewModel vm)
+            {
+                vm.ReedsAfgedrukt = false;
+            }
+        }
+        private void WeekView_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Alleen plain Enter / Return
+            if (e.Key == Key.Enter || e.Key == Key.Return)
+            {
+                // Als je ooit Alt+Enter voor iets speciaals wilt laten werken, kun je dit checken:
+                // if ((Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.Alt) return;
+
+                e.Handled = true;          // voorkom dat DataGrid/controls verder iets doen
+                Keyboard.ClearFocus();     // haalt de focus weg van het huidige veld
+            }
+        }
+        private void DagStatusMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem mi)
+                return;
+
+            if (mi.Tag is not string tag)
+                return;
+
+            // Via ContextMenu -> PlacementTarget -> DataContext
+            if (mi.Parent is not ContextMenu cm)
+                return;
+
+            if (cm.PlacementTarget is not FrameworkElement fe)
+                return;
+
+            if (fe.DataContext is not DagUrenViewModel dag)
+                return;
+
+            if (!Enum.TryParse<DagStatus>(tag, out var nieuweStatus))
+                return;
+
+            // Extra veiligheid: geen Weekend op weekdagen
+            if (!dag.IsWeekendDag && nieuweStatus == DagStatus.Weekend)
+                return;
+
+            dag.Status = nieuweStatus;
         }
     }
 }

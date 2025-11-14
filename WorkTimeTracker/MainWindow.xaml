@@ -7,13 +7,13 @@
         xmlns:views="clr-namespace:WorkTimeTracker.Views"
         xmlns:viewmodels="clr-namespace:WorkTimeTracker.ViewModels"
         mc:Ignorable="d"
-        Title="WorkTimeTracker" Height="500" Width="900"
+        Title="WorkTimeTracker" Height="561" Width="900"
         Icon="Assets/WorkTime.ico"
         Background="{DynamicResource MaterialDesignPaper}"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Style="{StaticResource MaterialDesignWindow}">
 
-    <Grid Margin="15">
+    <Grid Margin="8">
         <views:WeekView/>
     </Grid>
 </Window>

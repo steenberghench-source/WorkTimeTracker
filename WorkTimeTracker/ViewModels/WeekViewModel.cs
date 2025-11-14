@@ -24,7 +24,10 @@ namespace WorkTimeTracker.ViewModels
             $"{HuidigeWeekStart:dd/MM/yyyy} t/m {HuidigeWeekStart.AddDays(6):dd/MM/yyyy}";
 
         [ObservableProperty]
-        private bool reedsAfgedrukt;
+        private bool reedsAfgedrukt; 
+        
+        [ObservableProperty]
+        private string gebruikersNaam = string.Empty;
 
         public string WeekTitel =>
             $"Week {ISOWeek.GetWeekOfYear(HuidigeWeekStart)} - {HuidigeWeekStart:dd/MM/yyyy} t/m {HuidigeWeekStart.AddDays(6):dd/MM/yyyy}";
@@ -52,6 +55,7 @@ namespace WorkTimeTracker.ViewModels
             });
 
         private readonly DispatcherTimer _autoSaveTimer;
+
         private bool _heeftOnopgeslagenWijzigingen;
 
         public WeekViewModel()
@@ -61,6 +65,9 @@ namespace WorkTimeTracker.ViewModels
                 Interval = TimeSpan.FromSeconds(2)
             };
             _autoSaveTimer.Tick += AutoSaveTimer_Tick;
+
+            var settings = AppSettingsRepository.Load();
+            GebruikersNaam = settings.GebruikersNaam ?? string.Empty;
 
             HuidigeWeekStart = StartVanWeek(DateTime.Today);
             Dagen.CollectionChanged += Dagen_CollectionChanged;
@@ -237,6 +244,13 @@ namespace WorkTimeTracker.ViewModels
         partial void OnReedsAfgedruktChanged(bool value)
         {
             PlanAutoSave();
+        }
+        partial void OnGebruikersNaamChanged(string value)
+        {
+            AppSettingsRepository.Save(new AppSettings
+            {
+                GebruikersNaam = value ?? string.Empty
+            });
         }
     }
 }

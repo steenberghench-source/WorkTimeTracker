@@ -27,7 +27,7 @@ namespace WorkTimeTracker.Services
             public int RecupDagenCount { get; set; }
         }
 
-        public static void PrintWeeks(int jaar, int vanWeek, int totWeek)
+        public static void PrintWeeks(int jaar, int vanWeek, int totWeek, string gebruikersNaam)
         {
             var printDialog = new PrintDialog();
 
@@ -58,18 +58,34 @@ namespace WorkTimeTracker.Services
             // ✅ lijst om weken te onthouden die al afgedrukt waren
             var reedsAfgedrukteWeken = new List<(int Week, DateTime Start)>();
 
-            // 1) Week-pagina's
+            // ✅ eerst bepalen welke weken effectief geldig zijn
+            var wekenTePrinten = new List<(int Week, DateTime WeekStart)>();
             for (int week = vanWeek; week <= totWeek; week++)
             {
-                DateTime weekStart;
                 try
                 {
-                    weekStart = ISOWeek.ToDateTime(jaar, week, DayOfWeek.Monday);
+                    var weekStart = ISOWeek.ToDateTime(jaar, week, DayOfWeek.Monday);
+                    wekenTePrinten.Add((week, weekStart));
                 }
                 catch
                 {
-                    continue; // ongeldige week
+                    // ongeldige week -> negeren
                 }
+            }
+
+            if (!wekenTePrinten.Any())
+                return;
+
+            int totaalWeekPaginas = wekenTePrinten.Count;
+            int pageIndex = 0;
+
+            // 1) Week-pagina's
+            foreach (var wk in wekenTePrinten)
+            {
+                pageIndex++;
+
+                int week = wk.Week;
+                DateTime weekStart = wk.WeekStart;
 
                 var weekDto = WeekRepository.Load(weekStart)
                              ?? new WeekDto { WeekStart = weekStart, Dagen = new List<DagUrenDto>() };
@@ -103,21 +119,27 @@ namespace WorkTimeTracker.Services
 
                 string overurenTekst = $"Totaal overuren: {overuren:F2} u";
 
-                // inhoud iets kleiner dan de pagina, zodat het mooi gecentreerd is
+                // Paginanummer alleen tonen als er meerdere week-pagina's zijn
+                string pageText = totaalWeekPaginas > 1
+                    ? $"Pagina {pageIndex}/{totaalWeekPaginas}"
+                    : string.Empty;
+
+                // inhoud iets smaller dan de pagina
                 double contentWidth = pageSize.Width * 0.90;
-                double contentHeight = pageSize.Height * 0.80;
 
                 var view = new WeekPrintView
                 {
+                    UserName = gebruikersNaam,        // ✅ NAAM MEEGEVEN
                     HeaderText = headerText,
                     OverurenTekst = overurenTekst,
                     Dagen = dagenVm,
-                    Width = contentWidth,
-                    Height = contentHeight
+                    PageText = pageText,              // ✅ paginanummer voor onderaan
+                    Width = contentWidth
                 };
 
-                view.Measure(new Size(contentWidth, contentHeight));
-                view.Arrange(new Rect(new Point(0, 0), new Size(contentWidth, contentHeight)));
+                // layout laten uitrekenen
+                view.Measure(new Size(contentWidth, pageSize.Height));
+                view.Arrange(new Rect(new Point(0, 0), view.DesiredSize));
                 view.UpdateLayout();
 
                 var page = new FixedPage
@@ -128,7 +150,7 @@ namespace WorkTimeTracker.Services
                 };
 
                 double left = (pageSize.Width - contentWidth) / 2;
-                double top = (pageSize.Height - contentHeight) / 2;
+                double top = 40;   // vaste marge bovenaan -> totaal overuren dichter bij tabel
 
                 FixedPage.SetLeft(view, left);
                 FixedPage.SetTop(view, top);
@@ -140,17 +162,17 @@ namespace WorkTimeTracker.Services
             }
 
             // 2) Extra pagina: overzicht overuren per week + totaalsom
-            //    ✅ enkel als er minstens 2 weken geprint zijn
+            //    alleen als er minstens 2 weken geprint zijn
             if (overzicht.Count >= 2)
             {
-                var summaryPage = MaakOverzichtPagina(overzicht, pageSize);
+                var summaryPage = MaakOverzichtPagina(overzicht, pageSize, gebruikersNaam);
                 fixedDoc.Pages.Add(summaryPage);
             }
 
             // 3) Afdrukken
             printDialog.PrintDocument(fixedDoc.DocumentPaginator, "Urenregistratie");
 
-            // 4) ✅ Waarschuwing voor weken die al eerder als 'afgedrukt' stonden
+            // 4) Waarschuwing voor weken die al eerder als 'afgedrukt' stonden
             if (reedsAfgedrukteWeken.Count > 0)
             {
                 var sb = new StringBuilder();
@@ -175,7 +197,10 @@ namespace WorkTimeTracker.Services
             }
         }
 
-        private static PageContent MaakOverzichtPagina(List<WeekOverzicht> overzicht, Size pageSize)
+        private static PageContent MaakOverzichtPagina(
+            List<WeekOverzicht> overzicht,
+            Size pageSize,
+            string? gebruikersNaam)
         {
             double contentWidth = pageSize.Width * 0.80;
             double contentHeight = pageSize.Height * 0.70;
@@ -197,10 +222,16 @@ namespace WorkTimeTracker.Services
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });    // lijst
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                         // grote total
 
-            // Header
+            // Header (met optioneel naam)
+            string headerText = "Overzicht overuren per week";
+            if (!string.IsNullOrWhiteSpace(gebruikersNaam))
+            {
+                headerText += $" – {gebruikersNaam}";
+            }
+
             var header = new TextBlock
             {
-                Text = "Overzicht overuren per week",
+                Text = headerText,
                 FontSize = 18,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 16)
