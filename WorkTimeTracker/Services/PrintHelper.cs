@@ -1,32 +1,66 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Printing;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Markup;
 using System.Windows.Media;
-using WorkTimeTracker.Storage;
-using WorkTimeTracker.ViewModels;
+using WorkTimeTracker.Storage;    // WeekDto, DagUrenDto, WeekRepository
+using WorkTimeTracker.ViewModels; // DagUrenViewModel, DagStatus
+using WorkTimeTracker.Views;      // WeekPrintView
 
 namespace WorkTimeTracker.Services
 {
     public static class PrintHelper
     {
+        private const double ContractUrenPerDag = 8.0;
+
+        private class WeekOverzicht
+        {
+            public int WeekNummer { get; set; }
+            public DateTime WeekStart { get; set; }
+            public double Overuren { get; set; }
+            public int RecupDagenCount { get; set; }
+        }
+
         public static void PrintWeeks(int jaar, int vanWeek, int totWeek)
         {
-            var doc = new FlowDocument
+            var printDialog = new PrintDialog();
+
+            // Probeer vooraf A4 + landscape
+            if (printDialog.PrintTicket != null)
             {
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 11,
-                PagePadding = new Thickness(50),
-                ColumnWidth = double.PositiveInfinity // geen krantenkolommen
-            };
+                printDialog.PrintTicket.PageOrientation = PageOrientation.Landscape;
+                printDialog.PrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA4);
+            }
 
-            bool firstWeek = true;
+            if (printDialog.ShowDialog() != true)
+                return;
 
+            // Na de keuze nogmaals A4 + landscape (voor zover driver toelaat)
+            if (printDialog.PrintTicket != null)
+            {
+                printDialog.PrintTicket.PageOrientation = PageOrientation.Landscape;
+                printDialog.PrintTicket.PageMediaSize = new PageMediaSize(PageMediaSizeName.ISOA4);
+            }
+
+            var pageSize = new Size(printDialog.PrintableAreaWidth, printDialog.PrintableAreaHeight);
+
+            var fixedDoc = new FixedDocument();
+            fixedDoc.DocumentPaginator.PageSize = pageSize;
+
+            var overzicht = new List<WeekOverzicht>();
+
+            // ✅ lijst om weken te onthouden die al afgedrukt waren
+            var reedsAfgedrukteWeken = new List<(int Week, DateTime Start)>();
+
+            // 1) Week-pagina's
             for (int week = vanWeek; week <= totWeek; week++)
             {
-                // ISO-week naar maandag-datum
                 DateTime weekStart;
                 try
                 {
@@ -34,136 +68,307 @@ namespace WorkTimeTracker.Services
                 }
                 catch
                 {
-                    // als week niet geldig is voor dat jaar, sla over
-                    continue;
+                    continue; // ongeldige week
                 }
 
                 var weekDto = WeekRepository.Load(weekStart)
-                             ?? new WeekDto { WeekStart = weekStart };
+                             ?? new WeekDto { WeekStart = weekStart, Dagen = new List<DagUrenDto>() };
 
-                var weekTable = MaakWeekTabel(weekDto);
+                // Was deze week al eens als 'afgedrukt' opgeslagen?
+                bool wasAlAfgedrukt = weekDto.ReedsAfgedrukt;
 
-                // vanaf de 2e week: steeds op nieuwe pagina beginnen
-                if (!firstWeek)
-                    weekTable.BreakPageBefore = true;
+                var dagenVm = MaakDagViewModelsVoorWeek(weekStart, weekDto);
+                double overuren = BerekenWeekOveruren(dagenVm);
+                int recupCount = dagenVm.Count(d => d.Status == DagStatus.Recup);
 
-                firstWeek = false;
+                overzicht.Add(new WeekOverzicht
+                {
+                    WeekNummer = week,
+                    WeekStart = weekStart,
+                    Overuren = overuren,
+                    RecupDagenCount = recupCount
+                });
 
-                doc.Blocks.Add(weekTable);
+                if (wasAlAfgedrukt)
+                {
+                    reedsAfgedrukteWeken.Add((week, weekStart));
+                }
+
+                // ✅ Markeer elke geprinte week nu als 'afgedrukt' in de storage
+                WeekRepository.Save(weekStart, dagenVm, true);
+
+                string headerText =
+                    $"Week {ISOWeek.GetWeekOfYear(weekStart)} " +
+                    $"({weekStart:dd/MM/yyyy} - {weekStart.AddDays(6):dd/MM/yyyy})";
+
+                string overurenTekst = $"Totaal overuren: {overuren:F2} u";
+
+                // inhoud iets kleiner dan de pagina, zodat het mooi gecentreerd is
+                double contentWidth = pageSize.Width * 0.90;
+                double contentHeight = pageSize.Height * 0.80;
+
+                var view = new WeekPrintView
+                {
+                    HeaderText = headerText,
+                    OverurenTekst = overurenTekst,
+                    Dagen = dagenVm,
+                    Width = contentWidth,
+                    Height = contentHeight
+                };
+
+                view.Measure(new Size(contentWidth, contentHeight));
+                view.Arrange(new Rect(new Point(0, 0), new Size(contentWidth, contentHeight)));
+                view.UpdateLayout();
+
+                var page = new FixedPage
+                {
+                    Width = pageSize.Width,
+                    Height = pageSize.Height,
+                    Background = Brushes.White
+                };
+
+                double left = (pageSize.Width - contentWidth) / 2;
+                double top = (pageSize.Height - contentHeight) / 2;
+
+                FixedPage.SetLeft(view, left);
+                FixedPage.SetTop(view, top);
+                page.Children.Add(view);
+
+                var pageContent = new PageContent();
+                ((IAddChild)pageContent).AddChild(page);
+                fixedDoc.Pages.Add(pageContent);
             }
 
-            var printDialog = new PrintDialog();
-
-            // standaard naar landscape zetten vóór de dialoog
-            if (printDialog.PrintTicket != null)
-                printDialog.PrintTicket.PageOrientation = PageOrientation.Landscape;
-
-            if (printDialog.ShowDialog() == true)
+            // 2) Extra pagina: overzicht overuren per week + totaalsom
+            //    ✅ enkel als er minstens 2 weken geprint zijn
+            if (overzicht.Count >= 2)
             {
-                // na keuze printer nog eens expliciet naar landscape
-                if (printDialog.PrintTicket != null)
-                    printDialog.PrintTicket.PageOrientation = PageOrientation.Landscape;
+                var summaryPage = MaakOverzichtPagina(overzicht, pageSize);
+                fixedDoc.Pages.Add(summaryPage);
+            }
 
-                // doc afstemmen op printbare ruimte van de printer
-                doc.PageHeight = printDialog.PrintableAreaHeight;
-                doc.PageWidth = printDialog.PrintableAreaWidth;
-                doc.ColumnWidth = double.PositiveInfinity;
+            // 3) Afdrukken
+            printDialog.PrintDocument(fixedDoc.DocumentPaginator, "Urenregistratie");
 
-                IDocumentPaginatorSource dps = doc;
-                printDialog.PrintDocument(dps.DocumentPaginator, "Urenregistratie");
+            // 4) ✅ Waarschuwing voor weken die al eerder als 'afgedrukt' stonden
+            if (reedsAfgedrukteWeken.Count > 0)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Opgelet: de volgende weken stonden al als 'afgedrukt' gemarkeerd:");
+                sb.AppendLine();
+
+                foreach (var w in reedsAfgedrukteWeken.OrderBy(x => x.Start))
+                {
+                    var start = w.Start;
+                    var eind = start.AddDays(6);
+                    sb.AppendLine($"• Week {w.Week} ({start:dd/MM/yyyy} - {eind:dd/MM/yyyy})");
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("Deze afdruk kan dus (deels) een dubbele afdruk zijn.");
+
+                MessageBox.Show(
+                    sb.ToString(),
+                    "Mogelijke dubbele afdruk",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
 
-        private static Table MaakWeekTabel(WeekDto week)
+        private static PageContent MaakOverzichtPagina(List<WeekOverzicht> overzicht, Size pageSize)
         {
-            var culture = new CultureInfo("nl-BE");
-            var table = new Table { CellSpacing = 0 };
+            double contentWidth = pageSize.Width * 0.80;
+            double contentHeight = pageSize.Height * 0.70;
 
-            // kolommen: Dag, Tijd, Project, Extra, Locatie
-            for (int i = 0; i < 5; i++)
-                table.Columns.Add(new TableColumn());
-
-            // Week kop
-            var headerGroup = new TableRowGroup();
-            var headerRow = new TableRow();
-
-            headerRow.Cells.Add(new TableCell(new Paragraph(
-                new Run($"Week {ISOWeek.GetWeekOfYear(week.WeekStart)} " +
-                        $"({week.WeekStart:dd/MM/yyyy} - {week.WeekStart.AddDays(6):dd/MM/yyyy})")))
+            var page = new FixedPage
             {
-                ColumnSpan = 5,
+                Width = pageSize.Width,
+                Height = pageSize.Height,
+                Background = Brushes.White
+            };
+
+            var grid = new Grid
+            {
+                Width = contentWidth,
+                Height = contentHeight
+            };
+
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                         // header
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });    // lijst
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                         // grote total
+
+            // Header
+            var header = new TextBlock
+            {
+                Text = "Overzicht overuren per week",
+                FontSize = 18,
                 FontWeight = FontWeights.Bold,
-                FontSize = 13,
-                Padding = new Thickness(0, 0, 0, 4)
-            });
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            Grid.SetRow(header, 0);
+            grid.Children.Add(header);
 
-            headerGroup.Rows.Add(headerRow);
-            table.RowGroups.Add(headerGroup);
+            // Lijst
+            var stack = new StackPanel
+            {
+                Orientation = Orientation.Vertical
+            };
 
-            // Kolomtitels
-            var titlesGroup = new TableRowGroup();
-            var titlesRow = new TableRow();
-            titlesRow.Cells.Add(MakeHeaderCell("Dag"));
-            titlesRow.Cells.Add(MakeHeaderCell("Tijd"));
-            titlesRow.Cells.Add(MakeHeaderCell("Project"));
-            titlesRow.Cells.Add(MakeHeaderCell("Extra info"));
-            titlesRow.Cells.Add(MakeHeaderCell("Locatie"));
-            titlesGroup.Rows.Add(titlesRow);
-            table.RowGroups.Add(titlesGroup);
+            foreach (var w in overzicht.OrderBy(o => o.WeekStart))
+            {
+                var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Dagen
-            var daysGroup = new TableRowGroup();
+                string label =
+                    $"Week {w.WeekNummer} " +
+                    $"({w.WeekStart:dd/MM} - {w.WeekStart.AddDays(6):dd/MM})";
+
+                var weekText = new TextBlock
+                {
+                    Text = label,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(weekText, 0);
+                row.Children.Add(weekText);
+
+                string recupSuffix = string.Empty;
+                if (w.RecupDagenCount > 0)
+                {
+                    recupSuffix = w.RecupDagenCount == 1
+                        ? " (1 recupdag)"
+                        : $" ({w.RecupDagenCount} recupdagen)";
+                }
+
+                var urenText = new TextBlock
+                {
+                    Text = $"{w.Overuren:F2} u{recupSuffix}",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Right
+                };
+                Grid.SetColumn(urenText, 1);
+                row.Children.Add(urenText);
+
+                stack.Children.Add(row);
+            }
+
+            var scrollViewer = new ScrollViewer
+            {
+                Content = stack,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+
+            Grid.SetRow(scrollViewer, 1);
+            grid.Children.Add(scrollViewer);
+
+            double totaal = overzicht.Sum(o => o.Overuren);
+
+            // weekrange bepalen op basis van de werkelijk geprinte weken
+            int eersteWeek = overzicht.Min(o => o.WeekNummer);
+            int laatsteWeek = overzicht.Max(o => o.WeekNummer);
+
+            string weekRange = eersteWeek == laatsteWeek
+                ? $"W{eersteWeek}"
+                : $"W{eersteWeek}-W{laatsteWeek}";
+
+            var totaalText = new TextBlock
+            {
+                Text = $"Totaal overuren {weekRange}: {totaal:F2} u",
+                FontWeight = FontWeights.Bold,
+                FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0)
+            };
+
+            Grid.SetRow(totaalText, 2);
+            grid.Children.Add(totaalText);
+
+            // centreer de grid op de pagina
+            double left = (pageSize.Width - contentWidth) / 2;
+            double top = (pageSize.Height - contentHeight) / 2;
+
+            FixedPage.SetLeft(grid, left);
+            FixedPage.SetTop(grid, top);
+            page.Children.Add(grid);
+
+            var pageContent = new PageContent();
+            ((IAddChild)pageContent).AddChild(page);
+            return pageContent;
+        }
+
+        private static List<DagUrenViewModel> MaakDagViewModelsVoorWeek(DateTime weekStart, WeekDto weekDto)
+        {
+            var result = new List<DagUrenViewModel>();
 
             for (int i = 0; i < 7; i++)
             {
-                var datum = week.WeekStart.AddDays(i);
-                var dagDto = week.Dagen.Find(d => d.Datum.Date == datum.Date)
-                            ?? new DagUrenDto { Datum = datum, Status = DagStatus.Weekend };
+                var datum = weekStart.AddDays(i);
 
-                var row = new TableRow();
+                var dto = weekDto.Dagen
+                    .FirstOrDefault(d => d.Datum.Date == datum.Date);
 
-                string dagNaam = culture.TextInfo.ToTitleCase(
-                    datum.ToString("dddd dd MMMM", culture));
-
-                row.Cells.Add(MakeCell(dagNaam));
-
-                string tijd = "";
-                if (dagDto.StartTijd.HasValue && dagDto.EindTijd.HasValue)
-                    tijd = $"{dagDto.StartTijd:hh\\:mm} - {dagDto.EindTijd:hh\\:mm}";
-
-                row.Cells.Add(MakeCell(tijd));
-                row.Cells.Add(MakeCell(dagDto.Projectnaam));
-                row.Cells.Add(MakeCell(dagDto.ExtraInformatie));
-                row.Cells.Add(MakeCell(dagDto.Locatie));
-
-                if (dagDto.Status != DagStatus.Normaal)
+                if (dto == null)
                 {
-                    row.Cells[3].Blocks.Clear();
-                    row.Cells[3].Blocks.Add(new Paragraph(
-                        new Run(dagDto.Status.ToString().ToUpper()))
+                    var isWeekend = IsWeekend(datum);
+                    dto = new DagUrenDto
                     {
-                        FontWeight = FontWeights.Bold
-                    });
+                        Datum = datum,
+                        Status = isWeekend ? DagStatus.Weekend : DagStatus.Normaal
+                    };
                 }
 
-                daysGroup.Rows.Add(row);
+                var vm = new DagUrenViewModel
+                {
+                    Datum = dto.Datum,
+                    StartTijd = dto.StartTijd,
+                    EindTijd = dto.EindTijd,
+                    Projectnaam = dto.Projectnaam ?? string.Empty,
+                    ExtraInformatie = dto.ExtraInformatie ?? string.Empty,
+                    Locatie = dto.Locatie ?? string.Empty,
+                    Status = dto.Status
+                };
+
+                result.Add(vm);
             }
 
-            table.RowGroups.Add(daysGroup);
-            return table;
+            return result
+                .OrderBy(d => d.Datum)
+                .ToList();
         }
 
-        private static TableCell MakeHeaderCell(string text) =>
-            new TableCell(new Paragraph(new Run(text)))
-            {
-                FontWeight = FontWeights.Bold,
-                Padding = new Thickness(2, 0, 4, 2)
-            };
+        private static double BerekenWeekOveruren(IEnumerable<DagUrenViewModel> dagen)
+        {
+            double totaal = 0.0;
 
-        private static TableCell MakeCell(string? text) =>
-            new TableCell(new Paragraph(new Run(text ?? string.Empty)))
+            foreach (var d in dagen)
             {
-                Padding = new Thickness(2, 0, 4, 0)
-            };
+                if (d.Status != DagStatus.Normaal ||
+                    !d.StartTijd.HasValue ||
+                    !d.EindTijd.HasValue ||
+                    d.EindTijd <= d.StartTijd)
+                {
+                    continue;
+                }
+
+                double gewerkteUren = d.GewerkteUren; // bevat al pauze-logica
+
+                if (IsWeekend(d.Datum))
+                {
+                    // zaterdag/zondag: alles is overuur
+                    totaal += gewerkteUren;
+                }
+                else
+                {
+                    // ma–vr: verschil t.o.v. contracturen
+                    totaal += gewerkteUren - ContractUrenPerDag;
+                }
+            }
+
+            return totaal;
+        }
+
+        private static bool IsWeekend(DateTime datum) =>
+            datum.DayOfWeek == DayOfWeek.Saturday ||
+            datum.DayOfWeek == DayOfWeek.Sunday;
     }
 }

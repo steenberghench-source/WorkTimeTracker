@@ -13,8 +13,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using WorkTimeTracker.Services;
-using WorkTimeTracker.Views;
+using WorkTimeTracker.Storage;
 using WorkTimeTracker.ViewModels;
+using WorkTimeTracker.Views;
 
 namespace WorkTimeTracker.Views
 {
@@ -296,8 +297,31 @@ namespace WorkTimeTracker.Views
             if (DataContext is not WeekViewModel vm)
                 return;
 
+            // Startpunt standaard: de huidige week in de UI
+            DateTime initialWeekStart = vm.HuidigeWeekStart;
+
+            // Huidige week (maandag) bepalen
+            DateTime vandaag = DateTime.Today;
+            int diff = (7 + (vandaag.DayOfWeek - DayOfWeek.Monday)) % 7;
+            DateTime huidigeWeekStart = vandaag.Date.AddDays(-diff);
+
+            // Laatste reeds afgedrukte week uit de storage ophalen
+            DateTime? lastPrintedWeekStart = WeekRepository.GetLastPrintedWeek();
+
+            if (lastPrintedWeekStart.HasValue)
+            {
+                // Volgende week na de laatst gedrukte
+                DateTime candidate = lastPrintedWeekStart.Value.AddDays(7);
+
+                // Maar nooit later dan de huidige week
+                if (candidate > huidigeWeekStart)
+                    candidate = huidigeWeekStart;
+
+                initialWeekStart = candidate;
+            }
+
             var ownerWindow = Window.GetWindow(this);
-            var dlg = new PrintRangeWindow(vm.HuidigeWeekStart)
+            var dlg = new PrintRangeWindow(initialWeekStart)
             {
                 Owner = ownerWindow
             };
@@ -306,7 +330,7 @@ namespace WorkTimeTracker.Views
             {
                 PrintHelper.PrintWeeks(dlg.Jaar, dlg.VanWeek, dlg.TotWeek);
 
-                // jouw bestaande logica: checkbox uitvinken
+                // huidige week in de UI markeren als afgedrukt
                 vm.ReedsAfgedrukt = true;
             }
         }

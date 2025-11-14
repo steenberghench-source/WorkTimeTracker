@@ -1,17 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace WorkTimeTracker.Views
 {
@@ -25,12 +14,25 @@ namespace WorkTimeTracker.Views
         {
             InitializeComponent();
 
-            var isoYear = ISOWeek.GetYear(huidigeWeekStart);
-            var isoWeek = ISOWeek.GetWeekOfYear(huidigeWeekStart);
+            // ISO-jaar en week van de startweek (bv. "week na laatste geprinte")
+            int isoYear = ISOWeek.GetYear(huidigeWeekStart);
+            int isoWeek = ISOWeek.GetWeekOfYear(huidigeWeekStart);
+
+            // Huidige kalenderweek (vandaag) bepalen
+            DateTime vandaag = DateTime.Today;
+            int currentYear = ISOWeek.GetYear(vandaag);
+            int currentWeek = ISOWeek.GetWeekOfYear(vandaag);
+
+            // Default TotWeek:
+            // - als hetzelfde jaar: huidige kalenderweek
+            // - anders: gewoon dezelfde als VanWeek
+            int defaultTotWeek = (isoYear == currentYear)
+                ? currentWeek
+                : isoWeek;
 
             TbJaar.Text = isoYear.ToString(CultureInfo.InvariantCulture);
             TbVanWeek.Text = isoWeek.ToString(CultureInfo.InvariantCulture);
-            TbTotWeek.Text = isoWeek.ToString(CultureInfo.InvariantCulture);
+            TbTotWeek.Text = defaultTotWeek.ToString(CultureInfo.InvariantCulture);
         }
 
         private void Print_Click(object sender, RoutedEventArgs e)

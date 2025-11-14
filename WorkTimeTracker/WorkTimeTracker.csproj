@@ -15,11 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\" />
-    <Folder Include="Commands\" />
-    <Folder Include="CustomControls\" />
-    <Folder Include="Converters\" />
-    <Folder Include="Stores\" />
+    <Resource Include="Assets\WorkTime.png" />
   </ItemGroup>
 
 </Project>

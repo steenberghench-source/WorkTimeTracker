@@ -30,7 +30,7 @@ namespace WorkTimeTracker
         {
             if (DataContext is WeekViewModel vm)
             {
-                WeekRepository.Save(vm.HuidigeWeekStart, vm.Dagen);
+                WeekRepository.Save(vm.HuidigeWeekStart, vm.Dagen, vm.ReedsAfgedrukt);
             }
         }
     }

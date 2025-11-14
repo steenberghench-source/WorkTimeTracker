@@ -7,7 +7,8 @@
         xmlns:views="clr-namespace:WorkTimeTracker.Views"
         xmlns:viewmodels="clr-namespace:WorkTimeTracker.ViewModels"
         mc:Ignorable="d"
-        Title="Urenregistratie" Height="500" Width="900"
+        Title="WorkTimeTracker" Height="500" Width="900"
+        Icon="Assets/WorkTime.png"
         Background="{DynamicResource MaterialDesignPaper}"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Style="{StaticResource MaterialDesignWindow}">

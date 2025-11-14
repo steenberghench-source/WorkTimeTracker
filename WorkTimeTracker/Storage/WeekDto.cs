@@ -9,6 +9,7 @@ namespace WorkTimeTracker.Storage
     public class WeekDto
     {
         public DateTime WeekStart { get; set; }
+        public bool ReedsAfgedrukt { get; set; }
         public List<DagUrenDto> Dagen { get; set; } = new();
     }
 }

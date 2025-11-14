@@ -1,14 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Threading;
 using WorkTimeTracker.Storage;
 
@@ -22,6 +19,9 @@ namespace WorkTimeTracker.ViewModels
 
         [ObservableProperty]
         private DateTime huidigeWeekStart;
+        public int HuidigeWeekNummer => ISOWeek.GetWeekOfYear(HuidigeWeekStart);
+        public string HuidigeWeekPeriode =>
+            $"{HuidigeWeekStart:dd/MM/yyyy} t/m {HuidigeWeekStart.AddDays(6):dd/MM/yyyy}";
 
         [ObservableProperty]
         private bool reedsAfgedrukt;
@@ -52,7 +52,6 @@ namespace WorkTimeTracker.ViewModels
             });
 
         private readonly DispatcherTimer _autoSaveTimer;
-
         private bool _heeftOnopgeslagenWijzigingen;
 
         public WeekViewModel()
@@ -85,6 +84,9 @@ namespace WorkTimeTracker.ViewModels
 
             var opgeslagen = WeekRepository.Load(HuidigeWeekStart);
 
+            // ✅ checkbox-waarde inlezen (als er niks is: false)
+            ReedsAfgedrukt = opgeslagen?.ReedsAfgedrukt ?? false;
+
             if (opgeslagen is not null)
             {
                 foreach (var dto in opgeslagen.Dagen.OrderBy(d => d.Datum))
@@ -106,7 +108,7 @@ namespace WorkTimeTracker.ViewModels
             }
             else
             {
-                // jouw bestaande default-logica, incl. weekend:
+                // Default-logica voor een nieuwe week, incl. weekend
                 for (int i = 0; i < 7; i++)
                 {
                     var datum = HuidigeWeekStart.AddDays(i);
@@ -150,6 +152,7 @@ namespace WorkTimeTracker.ViewModels
             OnPropertyChanged(nameof(OverurenTotaal));
             PlanAutoSave();
         }
+
         private void PlanAutoSave()
         {
             _heeftOnopgeslagenWijzigingen = true;
@@ -164,7 +167,7 @@ namespace WorkTimeTracker.ViewModels
                 return;
 
             _heeftOnopgeslagenWijzigingen = false;
-            WeekRepository.Save(HuidigeWeekStart, Dagen);
+            WeekRepository.Save(HuidigeWeekStart, Dagen, ReedsAfgedrukt);
         }
 
         private static DagStatus VolgendeStatus(DagStatus huidige, bool isWeekendDag)
@@ -201,7 +204,7 @@ namespace WorkTimeTracker.ViewModels
         [RelayCommand]
         private void VorigeWeek()
         {
-            WeekRepository.Save(HuidigeWeekStart, Dagen);
+            WeekRepository.Save(HuidigeWeekStart, Dagen, ReedsAfgedrukt);
             HuidigeWeekStart = HuidigeWeekStart.AddDays(-7);
             LaadWeek();
         }
@@ -209,7 +212,7 @@ namespace WorkTimeTracker.ViewModels
         [RelayCommand]
         private void VolgendeWeek()
         {
-            WeekRepository.Save(HuidigeWeekStart, Dagen);
+            WeekRepository.Save(HuidigeWeekStart, Dagen, ReedsAfgedrukt);
             HuidigeWeekStart = HuidigeWeekStart.AddDays(7);
             LaadWeek();
         }
@@ -221,22 +224,19 @@ namespace WorkTimeTracker.ViewModels
                 return;
 
             bool isWeekendDag = IsWeekend(dag.Datum);
-
             dag.Status = VolgendeStatus(dag.Status, isWeekendDag);
-        }
-
-        [RelayCommand]
-        private void Print()
-        {
-            ReedsAfgedrukt = true;
-            // Hier later echte print-logica toevoegen (PrintDialog, FlowDocument, ...).
         }
 
         partial void OnHuidigeWeekStartChanged(DateTime value)
         {
             OnPropertyChanged(nameof(WeekTitel));
+            OnPropertyChanged(nameof(HuidigeWeekNummer));
+            OnPropertyChanged(nameof(HuidigeWeekPeriode));
         }
 
-
+        partial void OnReedsAfgedruktChanged(bool value)
+        {
+            PlanAutoSave();
+        }
     }
 }
