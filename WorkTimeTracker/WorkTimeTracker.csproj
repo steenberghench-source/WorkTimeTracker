@@ -6,7 +6,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\WorkTime.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\WorkTime.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -15,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\WorkTime.png" />
+    <Resource Include="Assets\WorkTime.ico" />
   </ItemGroup>
 
 </Project>

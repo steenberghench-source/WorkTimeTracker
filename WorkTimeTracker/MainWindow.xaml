@@ -8,7 +8,7 @@
         xmlns:viewmodels="clr-namespace:WorkTimeTracker.ViewModels"
         mc:Ignorable="d"
         Title="WorkTimeTracker" Height="500" Width="900"
-        Icon="Assets/WorkTime.png"
+        Icon="Assets/WorkTime.ico"
         Background="{DynamicResource MaterialDesignPaper}"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Style="{StaticResource MaterialDesignWindow}">
