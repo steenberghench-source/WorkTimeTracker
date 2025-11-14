@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using WorkTimeTracker.ViewModels;
 
 namespace WorkTimeTracker
 {
@@ -19,6 +20,7 @@ namespace WorkTimeTracker
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = new WeekViewModel();
         }
     }
 }

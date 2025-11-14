@@ -1,0 +1,288 @@
+﻿<UserControl x:Class="WorkTimeTracker.Views.WeekView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:local="clr-namespace:WorkTimeTracker.Views"
+      xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+      mc:Ignorable="d" 
+      d:DesignHeight="450" d:DesignWidth="800">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Header -->
+            <RowDefinition Height="*"/>
+            <!-- Tabel -->
+            <RowDefinition Height="Auto"/>
+            <!-- Footer -->
+        </Grid.RowDefinitions>
+
+        <!-- HEADER: week-navigatie en afdrukken -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,8" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <Button 
+                    Content="◀"
+                    Margin="0,0,8,0"
+                    Foreground="{DynamicResource MaterialDesignPaper}"
+                    Command="{Binding VorigeWeekCommand}" />
+
+                <TextBlock 
+                    Text="{Binding WeekTitel}"
+                    VerticalAlignment="Center" 
+                    FontSize="18"            
+                    FontWeight="Bold" />
+
+                <Button 
+                    Content="▶"
+                    Margin="8,0,0,0"
+                    Foreground="{DynamicResource MaterialDesignPaper}"
+                    Command="{Binding VolgendeWeekCommand}" />
+            </StackPanel>
+
+            <StackPanel 
+                Orientation="Horizontal"
+                DockPanel.Dock="Right"
+                VerticalAlignment="Center">
+                <CheckBox 
+                    Margin="0,0,4,0"
+                    IsChecked="{Binding ReedsAfgedrukt}" />
+                <Button 
+                    Content="Afdrukken"
+                    Foreground="{DynamicResource MaterialDesignPaper}"
+                    Command="{Binding PrintCommand}" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- TABEL MET 7 DAGEN -->
+        <DataGrid 
+            Grid.Row="1"
+            ItemsSource="{Binding Dagen}"
+            AutoGenerateColumns="False"
+            CanUserAddRows="False"
+            HeadersVisibility="Column"
+            RowHeaderWidth="100"
+            SelectionMode="Single"
+            SelectionUnit="Cell"
+            CanUserResizeColumns="False"
+            Style="{StaticResource MaterialDesignDataGrid}"
+            materialDesign:DataGridAssist.CellPadding="8"
+            materialDesign:DataGridAssist.ColumnHeaderPadding="16,8"
+            Margin="0,0,0,8">
+
+            <!-- Algemene stijl voor tekstvakken -->
+            <DataGrid.Resources>
+                <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+                
+                <Style TargetType="TextBox" x:Key="InvoerTextBoxStyle">
+                    <Setter Property="Margin" Value="0,0,4,0"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                </Style>
+            </DataGrid.Resources>
+
+            <!-- Rijheader: dag + status -->
+            <DataGrid.RowHeaderTemplate>
+                <DataTemplate>
+                    <StackPanel>
+                        <TextBlock Text="{Binding Datum, StringFormat={}{0:dddd}}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Status}" FontSize="10"/>
+                    </StackPanel>
+                </DataTemplate>
+            </DataGrid.RowHeaderTemplate>
+
+            <!-- Klikken op de rij: status toggelen -->
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Cursor" Value="Arrow"/>
+                    <Setter Property="MinHeight" Value="45"/>
+
+                    <!-- Als het géén normale werkdag is: alles vet + cursief -->
+                    <Style.Triggers>
+                        <!-- Geen highlight -->
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                        </Trigger>
+
+                        <!-- Vetgedrukt als geen normale werkdag -->
+                        <DataTrigger Binding="{Binding IsNormaleWerkdag}" Value="False">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="FontStyle"  Value="Italic"/>
+                            <Setter Property="Background" Value="#FFF4F6FB"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+            
+            <!-- Celstijl: geen highlight bij selectie -->
+            <DataGrid.CellStyle>
+                <Style TargetType="DataGridCell" BasedOn="{StaticResource MaterialDesignDataGridCell}">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.CellStyle>
+
+            <!-- *** HIER: kolommen in DataGrid.Columns *** -->
+            <DataGrid.Columns>
+                
+                <!-- KOLOM 1: dag + datum -->
+                <DataGridTemplateColumn Header="Dag" Width="auto" MinWidth="150" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock 
+                                Text="{Binding DagEnDatum}"
+                                Margin="4,0"
+                                VerticalAlignment="Center"
+                                FontWeight="Bold"
+                                FontSize="20"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+
+                    <DataGridTemplateColumn.CellStyle>
+                        <Style TargetType="DataGridCell" BasedOn="{StaticResource MaterialDesignDataGridCell}">
+                            <!-- Mooie hand-cursor op de volledige cel -->
+                            <Setter Property="Cursor" Value="Hand"/>
+
+                            <!-- Hele cel is klikbaar om type dag te togglen -->
+                            <EventSetter 
+                                Event="PreviewMouseLeftButtonDown"
+                                Handler="DagCell_MouseLeftButtonDown"/>
+                        </Style>
+                    </DataGridTemplateColumn.CellStyle>
+                </DataGridTemplateColumn>
+
+                <!-- KOLOM 2: start- en einduur -->
+                <DataGridTemplateColumn Header="Tijd">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel 
+                                Orientation="Horizontal"
+                                Visibility="{Binding IsNormaleWerkdag, Converter={StaticResource BoolToVis}}">
+                                <TextBox 
+                                     Text="{Binding StartTijd, 
+                                                    StringFormat='hh\\:mm',
+                                                    TargetNullValue='',
+                                                    UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource InvoerTextBoxStyle}"
+                                     Tag="Start"
+                                     GotKeyboardFocus="TijdTextBox_GotKeyboardFocus"
+                                     PreviewKeyDown="TijdTextBox_PreviewKeyDown"
+                                     HorizontalContentAlignment="Center"
+                                     Width="50"/>
+
+                                <TextBlock Text=":" VerticalAlignment="Center" Margin="0,0,4,0"/>
+
+                                <TextBox Width="50"
+                                     Text="{Binding EindTijd, 
+                                                    StringFormat='hh\\:mm',
+                                                    TargetNullValue='',
+                                                    UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource InvoerTextBoxStyle}"
+                                     Tag="Eind"
+                                     GotKeyboardFocus="TijdTextBox_GotKeyboardFocus"
+                                     PreviewKeyDown="TijdTextBox_PreviewKeyDown"
+                                     HorizontalContentAlignment="Center"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- KOLOM 3: Projectnaam -->
+                <DataGridTemplateColumn Header="Project">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBox 
+                                Text="{Binding Projectnaam, UpdateSourceTrigger=PropertyChanged}"
+                                Width="100"
+                                Visibility="{Binding IsNormaleWerkdag, Converter={StaticResource BoolToVis}}"
+                                Style="{StaticResource InvoerTextBoxStyle}"
+                                Tag="Projectnaam"
+                                PreviewMouseLeftButtonDown="AutoFillTextBox_PreviewMouseLeftButtonDown"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                
+                <!-- KOLOM 4: Extra info / Dagtype -->
+                <DataGridTemplateColumn Header="Extra informatie" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <!-- Normale werkdag: gewoon invulvak -->
+                                <TextBox 
+                                    x:Name="ExtraVak"
+                                    Text="{Binding ExtraInformatie, UpdateSourceTrigger=PropertyChanged}"
+                                    Style="{StaticResource InvoerTextBoxStyle}"
+                                    Tag="ExtraInformatie"
+                                    PreviewMouseLeftButtonDown="AutoFillTextBox_PreviewMouseLeftButtonDown"/>
+
+                                <!-- Geen normale werkdag: grote status-tekst over de rij -->
+                                <TextBlock 
+                                    x:Name="StatusLabel"
+                                    Text="{Binding Status}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="24"
+                                    FontWeight="Bold"
+                                    FontStyle="Italic"
+                                    Opacity="0.8"
+                                    Visibility="Collapsed"/>
+                            </Grid>
+
+                            <DataTemplate.Triggers>
+                                <!-- Niet-normale werkdag: vak weg, grote tekst aan -->
+                                <DataTrigger Binding="{Binding IsNormaleWerkdag}" Value="False">
+                                    <Setter TargetName="ExtraVak" Property="Visibility" Value="Collapsed"/>
+                                    <Setter TargetName="StatusLabel" Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+
+                                <!-- Normale werkdag: vak zichtbaar, grote tekst weg -->
+                                <DataTrigger Binding="{Binding IsNormaleWerkdag}" Value="True">
+                                    <Setter TargetName="ExtraVak" Property="Visibility" Value="Visible"/>
+                                    <Setter TargetName="StatusLabel" Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- KOLOM 5: Locatie -->
+                <DataGridTemplateColumn Header="Locatie">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!-- Let op: property in VM heet 'locatie', binding moet exact zo heten -->
+                            <TextBox 
+                                Text="{Binding Locatie, UpdateSourceTrigger=PropertyChanged}"
+                                Width="100"
+                                Visibility="{Binding IsNormaleWerkdag, Converter={StaticResource BoolToVis}}"
+                                Style="{StaticResource InvoerTextBoxStyle}"
+                                Tag="Locatie"
+                                PreviewMouseLeftButtonDown="AutoFillTextBox_PreviewMouseLeftButtonDown"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- FOOTER: totaal overuren -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <TextBlock Text="Totaal overuren: "
+                       FontWeight="Bold"
+                       Margin="0,0,4,0"/>
+            <TextBlock Text="{Binding OverurenTotaal, StringFormat={}{0:F2} u}"
+                       FontWeight="Bold"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

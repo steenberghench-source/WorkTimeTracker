@@ -8,4 +8,19 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="MaterialDesignColors" Version="5.3.0" />
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Models\" />
+    <Folder Include="Commands\" />
+    <Folder Include="CustomControls\" />
+    <Folder Include="Converters\" />
+    <Folder Include="Stores\" />
+    <Folder Include="Services\" />
+  </ItemGroup>
+
 </Project>
