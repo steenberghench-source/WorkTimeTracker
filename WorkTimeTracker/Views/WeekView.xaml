@@ -48,9 +48,17 @@
                     Margin="0,0,4,0"
                     IsChecked="{Binding ReedsAfgedrukt}" />
                 <Button 
-                    Content="Afdrukken"
                     Foreground="{DynamicResource MaterialDesignPaper}"
-                    Command="{Binding PrintCommand}" />
+                    Command="{x:Null}"
+                    Click="Afdrukken_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Printer"
+                                     Width="18"
+                                     Height="18"
+                                     Margin="0,0,6,0" />
+                        <TextBlock Text="Afdrukken" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </DockPanel>
 
@@ -64,6 +72,7 @@
             RowHeaderWidth="100"
             SelectionMode="Single"
             SelectionUnit="Cell"
+            SelectedCellsChanged="WeekDataGrid_SelectedCellsChanged"
             CanUserResizeColumns="False"
             Style="{StaticResource MaterialDesignDataGrid}"
             materialDesign:DataGridAssist.CellPadding="8"
@@ -98,6 +107,10 @@
                     <Setter Property="Cursor" Value="Arrow"/>
                     <Setter Property="MinHeight" Value="45"/>
 
+                    <!-- zorg dat ALLE rijen dezelfde linkerrand hebben -->
+                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+
                     <!-- Als het géén normale werkdag is: alles vet + cursief -->
                     <Style.Triggers>
                         <!-- Geen highlight -->
@@ -112,6 +125,12 @@
                             <Setter Property="FontStyle"  Value="Italic"/>
                             <Setter Property="Background" Value="#FFF4F6FB"/>
                         </DataTrigger>
+
+                        <DataTrigger Binding="{Binding IsVandaag}" Value="True">
+                            <!-- subtiele highlight links voor vandaag -->
+                            <Setter Property="BorderBrush" Value="#FF2196F3"/>
+                            <!-- zacht blauw -->
+                        </DataTrigger>
                     </Style.Triggers>
                 </Style>
             </DataGrid.RowStyle>
@@ -121,11 +140,19 @@
                 <Style TargetType="DataGridCell" BasedOn="{StaticResource MaterialDesignDataGridCell}">
                     <Setter Property="Background" Value="Transparent"/>
                     <Setter Property="BorderBrush" Value="Transparent"/>
+                    <!-- 🔹 deze cel kan geen keyboard focus krijgen -->
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="IsTabStop" Value="False"/>
 
                     <Style.Triggers>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="BorderBrush" Value="Transparent"/>
+                        </Trigger>
+
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter Property="BorderBrush" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -138,12 +165,18 @@
                 <DataGridTemplateColumn Header="Dag" Width="auto" MinWidth="150" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock 
-                                Text="{Binding DagEnDatum}"
-                                Margin="4,0"
-                                VerticalAlignment="Center"
-                                FontWeight="Bold"
-                                FontSize="20"/>
+                            <!-- Border vult de hele cel en handelt de muiskliks af -->
+                            <Border 
+                                Background="Transparent"
+                                Padding="4,0"
+                                MouseLeftButtonDown="DagCell_MouseLeftButtonDown"
+                                MouseRightButtonDown="DagCell_MouseRightButtonDown">
+                                <TextBlock 
+                                    Text="{Binding DagEnDatum}"
+                                    VerticalAlignment="Center"
+                                    FontWeight="Bold"
+                                    FontSize="20"/>
+                            </Border>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
 
@@ -152,10 +185,32 @@
                             <!-- Mooie hand-cursor op de volledige cel -->
                             <Setter Property="Cursor" Value="Hand"/>
 
-                            <!-- Hele cel is klikbaar om type dag te togglen -->
+                            <!-- Linkerklik: dagtype cyclen -->
                             <EventSetter 
                                 Event="PreviewMouseLeftButtonDown"
                                 Handler="DagCell_MouseLeftButtonDown"/>
+
+                            <!-- Rechterklik: dagtype resetten -->
+                            <EventSetter 
+                                Event="PreviewMouseRightButtonDown"
+                                Handler="DagCell_MouseRightButtonDown"/>
+
+
+                            <!-- 🔹 deze cel kan geen keyboard focus krijgen -->
+                            <Setter Property="Focusable" Value="False"/>
+                            <Setter Property="IsTabStop" Value="False"/>
+
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                </Trigger>
+
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                </Trigger>
+                            </Style.Triggers>
                         </Style>
                     </DataGridTemplateColumn.CellStyle>
                 </DataGridTemplateColumn>

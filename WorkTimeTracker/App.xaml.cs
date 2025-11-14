@@ -2,6 +2,7 @@
 using System.Configuration;
 using System.Data;
 using System.Windows;
+using WorkTimeTracker.Storage;
 using WorkTimeTracker.ViewModels;
 
 namespace WorkTimeTracker
@@ -15,6 +16,5 @@ namespace WorkTimeTracker
         {
             base.OnStartup(e);
         }
-
     }
 }

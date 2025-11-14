@@ -20,7 +20,6 @@
     <Folder Include="CustomControls\" />
     <Folder Include="Converters\" />
     <Folder Include="Stores\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>

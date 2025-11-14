@@ -12,6 +12,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using WorkTimeTracker.Services;
+using WorkTimeTracker.Views;
 using WorkTimeTracker.ViewModels;
 
 namespace WorkTimeTracker.Views
@@ -253,6 +255,60 @@ namespace WorkTimeTracker.Views
 
             // Voorkom dat DataGrid nog selectie/klik-gedrag uitvoert
             e.Handled = true;
+        }
+
+        private void DagCell_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement fe)
+                return;
+
+            if (fe.DataContext is not DagUrenViewModel dag)
+                return;
+
+            // Weekdag -> terug naar Normaal
+            // Weekenddag -> terug naar Weekend
+            if (dag.Datum.DayOfWeek == DayOfWeek.Saturday ||
+                dag.Datum.DayOfWeek == DayOfWeek.Sunday)
+            {
+                dag.Status = DagStatus.Weekend;
+            }
+            else
+            {
+                dag.Status = DagStatus.Normaal;
+            }
+
+            // voorkom dat DataGrid er nog iets mee doet (selectie / contextmenu)
+            e.Handled = true;
+        }
+        private void WeekDataGrid_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e)
+        {
+            if (sender is DataGrid grid)
+            {
+                // Alle geselecteerde cellen weg
+                grid.SelectedCells.Clear();
+
+                // Voor de zekerheid ook rijselectie weg
+                grid.UnselectAll();
+            }
+        }
+        private void Afdrukken_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is not WeekViewModel vm)
+                return;
+
+            var ownerWindow = Window.GetWindow(this);
+            var dlg = new PrintRangeWindow(vm.HuidigeWeekStart)
+            {
+                Owner = ownerWindow
+            };
+
+            if (dlg.ShowDialog() == true)
+            {
+                PrintHelper.PrintWeeks(dlg.Jaar, dlg.VanWeek, dlg.TotWeek);
+
+                // jouw bestaande logica: checkbox uitvinken
+                vm.ReedsAfgedrukt = true;
+            }
         }
     }
 }

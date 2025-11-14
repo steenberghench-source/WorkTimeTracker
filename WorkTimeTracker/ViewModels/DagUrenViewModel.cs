@@ -19,7 +19,7 @@ namespace WorkTimeTracker.ViewModels
         Weekend
     }
 
-    partial class DagUrenViewModel : ObservableObject
+    public partial class DagUrenViewModel : ObservableObject
     {
         [ObservableProperty]
         private DateTime datum;
@@ -40,7 +40,9 @@ namespace WorkTimeTracker.ViewModels
         private string locatie = string.Empty;
 
         [ObservableProperty]
-        private DagStatus status = DagStatus.Normaal;
+        private DagStatus status = DagStatus.Normaal;    
+
+        public bool IsVandaag => Datum.Date == DateTime.Today;
 
         public bool IsNormaleWerkdag => Status == DagStatus.Normaal;
 
@@ -109,6 +111,11 @@ namespace WorkTimeTracker.ViewModels
         partial void OnEindTijdChanged(TimeSpan? value)
         {
             OnPropertyChanged(nameof(GewerkteUren));
+        }
+        partial void OnDatumChanged(DateTime value)
+        {
+            OnPropertyChanged(nameof(DagEnDatum));
+            OnPropertyChanged(nameof(IsVandaag));
         }
     }
 }

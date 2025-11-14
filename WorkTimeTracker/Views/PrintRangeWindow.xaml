@@ -1,0 +1,50 @@
+﻿<Window x:Class="WorkTimeTracker.Views.PrintRangeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Weekbereik afdrukken"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize">
+    <StackPanel Margin="16">
+        <TextBlock Text="Kies het werkweek-bereik om af te drukken"
+                   FontWeight="Bold"
+                   Margin="0,0,0,12"/>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Jaar:"
+                       Width="80"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="TbJaar"
+                     Width="80"
+                     HorizontalContentAlignment="Right"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Van week:"
+                       Width="80"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="TbVanWeek"
+                     Width="80"
+                     HorizontalContentAlignment="Right"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <TextBlock Text="Tot week:"
+                       Width="80"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="TbTotWeek"
+                     Width="80"
+                     HorizontalContentAlignment="Right"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Annuleren"
+                    IsCancel="True"
+                    Margin="0,0,8,0"/>
+            <Button Content="Afdrukken"
+                    IsDefault="True"
+                    Click="Print_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

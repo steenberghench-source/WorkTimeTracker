@@ -9,6 +9,8 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Threading;
+using WorkTimeTracker.Storage;
 
 namespace WorkTimeTracker.ViewModels
 {
@@ -49,8 +51,18 @@ namespace WorkTimeTracker.ViewModels
                 return d.GewerkteUren - ContractUrenPerDag;
             });
 
+        private readonly DispatcherTimer _autoSaveTimer;
+
+        private bool _heeftOnopgeslagenWijzigingen;
+
         public WeekViewModel()
         {
+            _autoSaveTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(2)
+            };
+            _autoSaveTimer.Tick += AutoSaveTimer_Tick;
+
             HuidigeWeekStart = StartVanWeek(DateTime.Today);
             Dagen.CollectionChanged += Dagen_CollectionChanged;
             LaadWeek();
@@ -67,29 +79,51 @@ namespace WorkTimeTracker.ViewModels
         {
             // Unsubscribe oude dagen
             foreach (var dag in Dagen)
-            {
                 dag.PropertyChanged -= Dag_PropertyChanged;
-            }
 
             Dagen.Clear();
 
-            for (int i = 0; i < 7; i++)
+            var opgeslagen = WeekRepository.Load(HuidigeWeekStart);
+
+            if (opgeslagen is not null)
             {
-                var datum = HuidigeWeekStart.AddDays(i);
-
-                var dag = new DagUrenViewModel
+                foreach (var dto in opgeslagen.Dagen.OrderBy(d => d.Datum))
                 {
-                    Datum = datum,
-                    Status = IsWeekend(datum) ? DagStatus.Weekend : DagStatus.Normaal
-                };
+                    var dag = new DagUrenViewModel
+                    {
+                        Datum = dto.Datum,
+                        StartTijd = dto.StartTijd,
+                        EindTijd = dto.EindTijd,
+                        Projectnaam = dto.Projectnaam ?? string.Empty,
+                        ExtraInformatie = dto.ExtraInformatie ?? string.Empty,
+                        Locatie = dto.Locatie ?? string.Empty,
+                        Status = dto.Status
+                    };
 
-                dag.PropertyChanged += Dag_PropertyChanged;
-                Dagen.Add(dag);
+                    dag.PropertyChanged += Dag_PropertyChanged;
+                    Dagen.Add(dag);
+                }
+            }
+            else
+            {
+                // jouw bestaande default-logica, incl. weekend:
+                for (int i = 0; i < 7; i++)
+                {
+                    var datum = HuidigeWeekStart.AddDays(i);
+                    var dag = new DagUrenViewModel
+                    {
+                        Datum = datum,
+                        Status = IsWeekend(datum) ? DagStatus.Weekend : DagStatus.Normaal
+                    };
+                    dag.PropertyChanged += Dag_PropertyChanged;
+                    Dagen.Add(dag);
+                }
             }
 
             OnPropertyChanged(nameof(WeekTitel));
             OnPropertyChanged(nameof(OverurenTotaal));
         }
+
         private static bool IsWeekend(DateTime datum)
         {
             return datum.DayOfWeek == DayOfWeek.Saturday
@@ -99,15 +133,38 @@ namespace WorkTimeTracker.ViewModels
         private void Dag_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(DagUrenViewModel.GewerkteUren) ||
-                e.PropertyName == nameof(DagUrenViewModel.Status))
+                e.PropertyName == nameof(DagUrenViewModel.Status) ||
+                e.PropertyName == nameof(DagUrenViewModel.StartTijd) ||
+                e.PropertyName == nameof(DagUrenViewModel.EindTijd) ||
+                e.PropertyName == nameof(DagUrenViewModel.Projectnaam) ||
+                e.PropertyName == nameof(DagUrenViewModel.ExtraInformatie) ||
+                e.PropertyName == nameof(DagUrenViewModel.Locatie))
             {
                 OnPropertyChanged(nameof(OverurenTotaal));
+                PlanAutoSave();
             }
         }
 
         private void Dagen_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(OverurenTotaal));
+            PlanAutoSave();
+        }
+        private void PlanAutoSave()
+        {
+            _heeftOnopgeslagenWijzigingen = true;
+            _autoSaveTimer.Stop();
+            _autoSaveTimer.Start();   // vanaf nu 2s geen nieuwe wijziging -> save
+        }
+
+        private void AutoSaveTimer_Tick(object? sender, EventArgs e)
+        {
+            _autoSaveTimer.Stop();
+            if (!_heeftOnopgeslagenWijzigingen)
+                return;
+
+            _heeftOnopgeslagenWijzigingen = false;
+            WeekRepository.Save(HuidigeWeekStart, Dagen);
         }
 
         private static DagStatus VolgendeStatus(DagStatus huidige, bool isWeekendDag)
@@ -144,6 +201,7 @@ namespace WorkTimeTracker.ViewModels
         [RelayCommand]
         private void VorigeWeek()
         {
+            WeekRepository.Save(HuidigeWeekStart, Dagen);
             HuidigeWeekStart = HuidigeWeekStart.AddDays(-7);
             LaadWeek();
         }
@@ -151,6 +209,7 @@ namespace WorkTimeTracker.ViewModels
         [RelayCommand]
         private void VolgendeWeek()
         {
+            WeekRepository.Save(HuidigeWeekStart, Dagen);
             HuidigeWeekStart = HuidigeWeekStart.AddDays(7);
             LaadWeek();
         }
@@ -177,5 +236,7 @@ namespace WorkTimeTracker.ViewModels
         {
             OnPropertyChanged(nameof(WeekTitel));
         }
+
+
     }
 }

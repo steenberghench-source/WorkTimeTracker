@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -8,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using WorkTimeTracker.Storage;
 using WorkTimeTracker.ViewModels;
 
 namespace WorkTimeTracker
@@ -21,6 +23,15 @@ namespace WorkTimeTracker
         {
             InitializeComponent();
             DataContext = new WeekViewModel();
+
+            this.Closing += MainWindow_Closing;
+        }
+        private void MainWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (DataContext is WeekViewModel vm)
+            {
+                WeekRepository.Save(vm.HuidigeWeekStart, vm.Dagen);
+            }
         }
     }
 }
