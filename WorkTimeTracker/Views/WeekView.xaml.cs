@@ -305,9 +305,6 @@ namespace WorkTimeTracker.Views
             if (dlg.ShowDialog() == true)
             {
                 PrintHelper.PrintWeeks(dlg.Jaar, dlg.VanWeek, dlg.TotWeek, vm.GebruikersNaam);
-
-                // huidige week in de UI markeren als afgedrukt
-                vm.ReedsAfgedrukt = true;
             }
         }
         private void PrintCommand_Executed(object sender, ExecutedRoutedEventArgs e)
