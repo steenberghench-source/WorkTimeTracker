@@ -16,5 +16,7 @@ namespace WorkTimeTracker.Storage
         public string? ExtraInformatie { get; set; }
         public string? Locatie { get; set; }
         public DagStatus Status { get; set; }
+        public bool? MagInvoeren { get; set; }
+        public bool? AllesAlsOveruren { get; set; }
     }
 }

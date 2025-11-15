@@ -35,23 +35,22 @@ namespace WorkTimeTracker.ViewModels
         public double OverurenTotaal =>
             Dagen.Sum(d =>
             {
-                // We tellen alleen dagen met status Normaal en geldige tijdsinterval
-                if (d.Status != DagStatus.Normaal ||
-                    !d.StartTijd.HasValue ||
+                if (!d.StartTijd.HasValue ||
                     !d.EindTijd.HasValue ||
                     d.EindTijd <= d.StartTijd)
                 {
                     return 0;
                 }
 
-                // Zaterdag/zondag: alles is overuur (pauze al verrekend in GewerkteUren)
-                if (IsWeekend(d.Datum))
-                {
-                    return d.GewerkteUren;
-                }
+                double gewerkteUren = d.GewerkteUren;
 
-                // Ma–vr: overuren = gewerkte uren - contracturen
-                return d.GewerkteUren - ContractUrenPerDag;
+                if (d.AllesAlsOveruren)
+                    return gewerkteUren;
+
+                if (d.Status != DagStatus.Normaal)
+                    return 0;
+
+                return gewerkteUren - ContractUrenPerDag;
             });
 
         private readonly DispatcherTimer _autoSaveTimer;
@@ -105,8 +104,15 @@ namespace WorkTimeTracker.ViewModels
                         Projectnaam = dto.Projectnaam ?? string.Empty,
                         ExtraInformatie = dto.ExtraInformatie ?? string.Empty,
                         Locatie = dto.Locatie ?? string.Empty,
-                        Status = dto.Status
+                        Status = dto.Status,
                     };
+
+                    // Alleen als er expliciet iets opgeslagen is, overschrijven we de defaults
+                    if (dto.MagInvoeren.HasValue)
+                        dag.MagInvoeren = dto.MagInvoeren.Value;
+
+                    if (dto.AllesAlsOveruren.HasValue)
+                        dag.AllesAlsOveruren = dto.AllesAlsOveruren.Value;
 
                     dag.PropertyChanged += Dag_PropertyChanged;
                     Dagen.Add(dag);
@@ -146,7 +152,9 @@ namespace WorkTimeTracker.ViewModels
                 e.PropertyName == nameof(DagUrenViewModel.EindTijd) ||
                 e.PropertyName == nameof(DagUrenViewModel.Projectnaam) ||
                 e.PropertyName == nameof(DagUrenViewModel.ExtraInformatie) ||
-                e.PropertyName == nameof(DagUrenViewModel.Locatie))
+                e.PropertyName == nameof(DagUrenViewModel.Locatie) ||
+                e.PropertyName == nameof(DagUrenViewModel.AllesAlsOveruren) ||
+                e.PropertyName == nameof(DagUrenViewModel.MagInvoeren))  
             {
                 OnPropertyChanged(nameof(OverurenTotaal));
                 PlanAutoSave();

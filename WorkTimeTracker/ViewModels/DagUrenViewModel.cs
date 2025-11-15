@@ -36,11 +36,18 @@ namespace WorkTimeTracker.ViewModels
         private string locatie = string.Empty;
 
         [ObservableProperty]
+        private bool magInvoeren = true;
+
+        [ObservableProperty]
+        private bool allesAlsOveruren;
+
+        [ObservableProperty]
         private DagStatus status = DagStatus.Normaal;
 
         public bool IsVandaag => Datum.Date == DateTime.Today;
 
         public bool IsNormaleWerkdag => Status == DagStatus.Normaal;
+        public bool IsNietNormaleWerkdag => Status != DagStatus.Normaal;
 
         public bool IsWeekendDag =>
             Datum.DayOfWeek == DayOfWeek.Saturday ||
@@ -73,7 +80,6 @@ namespace WorkTimeTracker.ViewModels
                 var start = StartTijd.Value;
                 var eind = EindTijd.Value;
 
-                // Bruto uren (zonder rekening te houden met pauze)
                 var uren = (eind - start).TotalHours;
 
                 // Als het volledige blok 12:00–12:30 binnen de werktijd ligt -> 0,5u pauze aftrekken
@@ -115,7 +121,30 @@ namespace WorkTimeTracker.ViewModels
 
         partial void OnStatusChanged(DagStatus value)
         {
+
+            // Default gedrag per statustype
+            switch (value)
+            {
+                case DagStatus.Normaal:
+                    MagInvoeren = true;
+                    AllesAlsOveruren = false;
+                    break;
+
+                case DagStatus.Weekend:
+                    // weekend: je mag invullen en alles telt als overuren
+                    MagInvoeren = true;
+                    AllesAlsOveruren = true;
+                    break;
+
+                default:
+                    // Ziek / Verlof / ADV / Recup / Feestdag ...
+                    MagInvoeren = false;          // velden standaard dicht
+                    AllesAlsOveruren = false;     // en geen full-overuren
+                    break;
+            }
+
             OnPropertyChanged(nameof(IsNormaleWerkdag));
+            OnPropertyChanged(nameof(IsNietNormaleWerkdag));
             OnPropertyChanged(nameof(GewerkteUren));
             OnPropertyChanged(nameof(StatusLabel));
         }

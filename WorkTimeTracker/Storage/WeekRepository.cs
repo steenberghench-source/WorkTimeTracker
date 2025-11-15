@@ -50,7 +50,9 @@ namespace WorkTimeTracker.Storage
                     Projectnaam = d.Projectnaam,
                     ExtraInformatie = d.ExtraInformatie,
                     Locatie = d.Locatie,
-                    Status = d.Status
+                    Status = d.Status,
+                    MagInvoeren = d.MagInvoeren,
+                    AllesAlsOveruren = d.AllesAlsOveruren
                 }).ToList()
             };
 
