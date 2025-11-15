@@ -91,7 +91,6 @@ namespace WorkTimeTracker.ViewModels
 
             var opgeslagen = WeekRepository.Load(HuidigeWeekStart);
 
-            // ✅ checkbox-waarde inlezen (als er niks is: false)
             ReedsAfgedrukt = opgeslagen?.ReedsAfgedrukt ?? false;
 
             if (opgeslagen is not null)

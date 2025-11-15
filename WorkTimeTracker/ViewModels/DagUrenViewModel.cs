@@ -42,12 +42,11 @@ namespace WorkTimeTracker.ViewModels
 
         public bool IsNormaleWerkdag => Status == DagStatus.Normaal;
 
-        /// <summary>
-        /// Handig voor contextmenu: alleen zaterdag/zondag mogen "Weekend" zijn.
-        /// </summary>
         public bool IsWeekendDag =>
             Datum.DayOfWeek == DayOfWeek.Saturday ||
             Datum.DayOfWeek == DayOfWeek.Sunday;
+
+        public bool IsWeekDag => !IsWeekendDag;
 
         /// <summary>
         /// Label voor weergave in de UI (Vakantie → Verlof, etc.).

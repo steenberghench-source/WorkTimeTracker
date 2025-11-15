@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -304,7 +305,22 @@ namespace WorkTimeTracker.Views
 
             if (dlg.ShowDialog() == true)
             {
+                // 1) Weken echt afdrukken + in JSON op 'afgedrukt' zetten
                 PrintHelper.PrintWeeks(dlg.Jaar, dlg.VanWeek, dlg.TotWeek, vm.GebruikersNaam);
+
+                // 2) Bepalen of de huidige week in de geprinte range zat
+                int currentIsoYear = ISOWeek.GetYear(vm.HuidigeWeekStart);
+                int currentIsoWeek = ISOWeek.GetWeekOfYear(vm.HuidigeWeekStart);
+
+                bool huidigeWeekMeegeprint =
+                    currentIsoYear == dlg.Jaar &&
+                    currentIsoWeek >= dlg.VanWeek &&
+                    currentIsoWeek <= dlg.TotWeek;
+
+                if (huidigeWeekMeegeprint)
+                {
+                    vm.ReedsAfgedrukt = true;
+                }
             }
         }
         private void PrintCommand_Executed(object sender, ExecutedRoutedEventArgs e)
